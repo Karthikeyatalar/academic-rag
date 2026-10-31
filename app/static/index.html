@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Academic RAG Assistant — Strict Citation & Anti-Hallucination Guardrails</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Global Toast Notification Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Main App Shell -->
+  <div class="app-layout">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="header-brand">
+        <div class="brand-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+            <path d="M9 7h6M9 11h6M9 15h3"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="brand-title">Academic RAG Assistant</h1>
+          <p class="brand-subtitle">Dense Metric Retrieval · Verbatim Page Citation · Two-Tier Anti-Hallucination Guardrail</p>
+        </div>
+      </div>
+
+      <!-- Session & Backend Telemetry Bar -->
+      <div class="header-actions">
+        <div class="telemetry-pill" title="SQLite 3 Relational & Vector Storage">
+          <span class="status-dot green"></span>
+          <span class="pill-label">SQLite 3</span>
+        </div>
+        <div class="telemetry-pill" id="ollama-pill" title="Ollama llama3:latest">
+          <span class="status-dot green" id="ollama-dot"></span>
+          <span class="pill-label" id="ollama-text">Ollama Engine</span>
+        </div>
+        <div class="session-box">
+          <span class="session-label">Session:</span>
+          <code id="session-id-display" class="session-code">--------</code>
+          <button id="copy-session-btn" class="icon-btn" title="Copy Session ID">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+          </button>
+          <button id="new-session-btn" class="btn btn-secondary btn-sm">New Session</button>
+          <button id="reset-session-btn" class="btn btn-danger btn-sm" title="Drop session vector collection">Reset</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content Grid -->
+    <main class="content-grid">
+      <!-- Left Column: Document Ingestion & Pipeline Specs -->
+      <section class="left-pane">
+        <!-- Document Upload Card -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="card-step-badge">1</span>
+              <div>
+                <h2 class="card-title">Document Ingestion</h2>
+                <p class="card-desc">Upload academic papers in PDF, DOCX, or TXT format</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dropzone -->
+          <div id="dropzone" class="dropzone">
+            <input type="file" id="file-input" multiple accept=".pdf,.docx,.txt" class="file-input-hidden">
+            <div class="dropzone-content">
+              <div class="upload-icon-circle">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="17 8 12 3 7 8"/>
+                  <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+              </div>
+              <p class="dropzone-prompt"><strong>Click to browse</strong> or drag and drop files here</p>
+              <div class="format-tags">
+                <span class="badge badge-neutral">PDF (Page-Split)</span>
+                <span class="badge badge-neutral">DOCX</span>
+                <span class="badge badge-neutral">TXT</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Staged Files Preview -->
+          <div id="staged-files-container" class="staged-container hidden">
+            <div class="staged-header">
+              <span class="staged-count-label">Staged Files (<span id="staged-count">0</span>)</span>
+              <button id="clear-staged-btn" class="text-btn">Clear All</button>
+            </div>
+            <ul id="staged-files-list" class="staged-list"></ul>
+            <button id="upload-btn" class="btn btn-primary btn-block">
+              <span id="upload-btn-text">Ingest & Index Chunks</span>
+              <span id="upload-spinner" class="spinner hidden"></span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Indexed Knowledge Base Card -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="card-step-badge">2</span>
+              <div>
+                <h2 class="card-title">Indexed Knowledge Base</h2>
+                <p class="card-desc">Session-isolated dense vector collection</p>
+              </div>
+            </div>
+            <span id="chunk-counter-badge" class="badge badge-accent">0 Chunks Indexed</span>
+          </div>
+
+          <div id="indexed-files-container" class="indexed-list-empty">
+            <p class="empty-hint">No documents indexed in this session yet. Upload a document above to begin.</p>
+          </div>
+          <ul id="indexed-files-list" class="indexed-files-list hidden"></ul>
+        </div>
+
+        <!-- Two-Tier Guardrails Architecture Card -->
+        <div class="card info-card">
+          <h3 class="info-card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+            Deterministic Guardrail Architecture
+          </h3>
+          <div class="guardrail-steps">
+            <div class="guardrail-step">
+              <div class="step-num">S1</div>
+              <div>
+                <strong>Stage-1: Pre-Retrieval Distance Filter</strong>
+                <p>Cosine distance threshold cutoff at <code>0.60</code>. Queries exceeding this cutoff are immediately refused to eliminate out-of-scope hallucinations.</p>
+              </div>
+            </div>
+            <div class="guardrail-step">
+              <div class="step-num">S2</div>
+              <div>
+                <strong>Stage-2: Verbatim Citation Verification</strong>
+                <p>Post-generation exact substring verification. Normalizes whitespace and casing to guarantee citations are 100% grounded in indexed source pages.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Column: Academic Query & Guardrail Verification -->
+      <section class="right-pane">
+        <!-- Question Formulation Card -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title-group">
+              <span class="card-step-badge">3</span>
+              <div>
+                <h2 class="card-title">Academic Inquiry</h2>
+                <p class="card-desc">Ask a question strictly grounded in your uploaded documents</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Suggested Quick Prompts -->
+          <div class="quick-prompts">
+            <span class="quick-prompts-label">Try Example:</span>
+            <button class="quick-prompt-chip" data-query="At what epoch and learning rate was algorithm convergence reached?">
+              Convergence Epoch & Learning Rate
+            </button>
+            <button class="quick-prompt-chip" data-query="What optimization method and initial loss were measured in the experiments?">
+              Optimizer & Initial Loss
+            </button>
+            <button class="quick-prompt-chip adversarial" data-query="Who was the first emperor of Rome and when did he rule?">
+              Adversarial Query (Triggers Stage-1 Refusal)
+            </button>
+          </div>
+
+          <!-- Query Input Area -->
+          <div class="query-input-wrapper">
+            <textarea
+              id="query-input"
+              rows="3"
+              placeholder="Enter your academic inquiry (e.g. 'What were the quantitative findings on page 2?')..."
+              class="query-textarea"
+            ></textarea>
+            <div class="query-actions">
+              <span class="keyboard-hint">Press <kbd>Ctrl</kbd> + <kbd>Enter</kbd> to submit</span>
+              <button id="submit-query-btn" class="btn btn-primary">
+                <span id="query-btn-text">Submit Query</span>
+                <span id="query-spinner" class="spinner hidden"></span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live Query Response & Guardrail Inspector Card -->
+        <div id="results-card" class="card results-card hidden">
+          <div class="card-header">
+            <h2 class="card-title">Verification Telemetry & Results</h2>
+            <div id="result-status-badge" class="badge badge-success">ANSWERED & VERIFIED</div>
+          </div>
+
+          <!-- Guardrail Telemetry Pills -->
+          <div class="telemetry-row">
+            <div id="stage1-pill" class="guardrail-pill pill-pass">
+              <span class="guardrail-icon">✓</span>
+              <span>Stage-1: Relevance Verified (&le; 0.60)</span>
+            </div>
+            <div id="stage2-pill" class="guardrail-pill pill-pass">
+              <span class="guardrail-icon">✓</span>
+              <span>Stage-2: Verbatim Substring Citation Verified</span>
+            </div>
+          </div>
+
+          <!-- Factual Answer -->
+          <div class="answer-section">
+            <h4 class="section-subheading">Factual Answer</h4>
+            <div id="answer-text" class="answer-content">
+              The algorithm convergence was reached at epoch 42 with a learning rate of 0.005.
+            </div>
+          </div>
+
+          <!-- Citation Block (Only shown when answered) -->
+          <div id="citation-container" class="citation-section">
+            <h4 class="section-subheading">Deterministic Page-Level Citation</h4>
+            <div class="citation-box">
+              <div class="citation-quote">
+                <span class="quote-mark">“</span>
+                <span id="verbatim-quote-text">...</span>
+                <span class="quote-mark">”</span>
+              </div>
+              <div class="citation-metadata">
+                <span class="meta-pill">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                  </svg>
+                  <strong id="citation-source">paper.pdf</strong>
+                </span>
+                <span class="meta-pill page-pill">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <polyline points="12 6 12 12 16 14"/>
+                  </svg>
+                  Page <strong id="citation-page">1</strong>
+                </span>
+                <span class="meta-badge verified">100% In-Context Match</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Refusal Explanation (Only shown when refused) -->
+          <div id="refusal-explanation" class="refusal-box hidden">
+            <div class="refusal-header">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+              <strong>Anti-Hallucination Guardrail Active</strong>
+            </div>
+            <p id="refusal-reason">
+              The query failed one or more deterministic anti-hallucination verification checks.
+              To prevent generative fabrication, the system strictly refused to invent information.
+            </p>
+          </div>
+        </div>
+
+        <!-- Query History -->
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Inquiry History</h2>
+            <button id="clear-history-btn" class="text-btn">Clear History</button>
+          </div>
+          <div id="history-empty" class="history-empty">
+            <p class="empty-hint">Your session inquiry history will appear here.</p>
+          </div>
+          <ul id="history-list" class="history-list hidden"></ul>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
+

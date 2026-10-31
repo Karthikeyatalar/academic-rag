@@ -1,0 +1,22 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+.env
+
+# Database and vector storage
+data/*.db
+data/*.sqlite*
+data/chromadb/
+!data/.gitkeep
+
+# Sample test documents
+tests/sample_docs/*.pdf
+tests/sample_docs/*.docx
+tests/sample_docs/*.txt
+!tests/sample_docs/.gitkeep

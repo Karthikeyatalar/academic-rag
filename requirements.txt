@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+python-multipart
+pymupdf
+python-docx
+langchain-text-splitters
+sentence-transformers
+numpy
+requests
+pydantic
+pytest
+aiofiles
+
